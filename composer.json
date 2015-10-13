@@ -1,0 +1,20 @@
+{
+    "name": "def/error",
+    "description": "php error handler",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "andrew-kamenchuk",
+            "email": "andrew.kamenchuk@gmail.com"
+        }
+    ],
+    "require": {
+			"php" : ">=5.4"
+    },
+    "autoload": {
+			"psr-4": {"def\\Error\\": ""}
+    },
+    "suggest": {
+			"psr/log": "bind logger to handler"
+    }
+}
