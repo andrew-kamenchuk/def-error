@@ -6,47 +6,67 @@ use Psr\Log\LogLevel;
 
 class ExceptionHandler
 {
-	protected $handlers = [];
+    protected $handlers = [];
 
-	public function on($class, callable $handler)
-	{
-		if(!isset($this->handlers[$class])) {
-			$this->handlers[$class] = [];
-		}
+    public function __construct(callable $defaultHandler = null)
+    {
+        if (isset($defaultHandler)) {
+            $this->on('Exception', $defaultHandler);
+        }
+    }
 
-		\array_unshift($this->handlers[$class], $handler);
-	}
+    public function on($class, callable $handler)
+    {
+        if (!isset($this->handlers[$class])) {
+            $this->handlers[$class] = [];
+        }
 
-	public function off($class, callable $handler = null)
-	{
-		if(!isset($handler))
-			unset($this->handlers[$class]);
-		elseif(isset($this->handlers[$class]) && false !== $key = \array_search($handler, $this->handlers[$class]))
-			unset($this->handlers[$class][$key]);
-	}
+        \array_unshift($this->handlers[$class], $handler);
+    }
 
-	public function handle(\Exception $e)
-	{
-		$class = \get_class($e);
+    public function off($class, callable $handler = null)
+    {
+        if (!isset($this->handlers[$class])) {
+            return;
+        }
 
-		do if(isset($this->handlers[$class]))
-			foreach($this->handlers[$class] as $handler) {
-				if(true === $handler($e)) return true;
-		} while($class = \get_parent_class($class));
+        if (!isset($handler)) {
+            unset($this->handlers[$class]);
+        } elseif (false !== $key = \array_search($handler, $this->handlers[$class], true)) {
+            unset($this->handlers[$class][$key]);
+        }
+    }
 
-		throw $e;
-	}
+    public function handle(\Exception $e)
+    {
+        $class = \get_class($e);
 
-	public function register()
-	{
-		return \set_exception_handler([$this, 'handle']);
-	}
+        do {
+            if (isset($this->handlers[$class])) {
+                foreach ($this->handlers[$class] as $handler) {
+                    if (true === $handler($e)) {
+                        return true;
+                    }
+                }
+            }
+        } while ($class = \get_parent_class($class));
 
-	public function bindLogger(LoggerInterface $logger, $level = LogLevel::ERROR, $class = 'Exception')
-	{
-		return $this->on($class, function(\Exception $e) use($logger, $level) {
-			return $logger->log($level, $e->getMessage(), ['exception' => $e]);
-		});
-	}
+        return false;
+    }
 
+    public function register()
+    {
+        return \set_exception_handler(function (\Exception $e) {
+            if (!$this->handle($e)) {
+                throw $e;
+            }
+        });
+    }
+
+    public function bindLogger(LoggerInterface $logger, $level = LogLevel::ERROR, $class = 'Exception')
+    {
+        return $this->on($class, function (\Exception $e) use ($logger, $level) {
+            $logger->log($level, $e->getMessage(), ['exception' => $e]);
+        });
+    }
 }
