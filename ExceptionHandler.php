@@ -1,6 +1,7 @@
 <?php
 namespace def\Error;
 
+use Exception;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 
@@ -11,7 +12,7 @@ class ExceptionHandler
     public function __construct(callable $defaultHandler = null)
     {
         if (isset($defaultHandler)) {
-            $this->on('Exception', $defaultHandler);
+            $this->on(Exception::class, $defaultHandler);
         }
     }
 
@@ -21,7 +22,7 @@ class ExceptionHandler
             $this->handlers[$class] = [];
         }
 
-        \array_unshift($this->handlers[$class], $handler);
+        array_unshift($this->handlers[$class], $handler);
     }
 
     public function off($class, callable $handler = null)
@@ -32,14 +33,14 @@ class ExceptionHandler
 
         if (!isset($handler)) {
             unset($this->handlers[$class]);
-        } elseif (false !== $key = \array_search($handler, $this->handlers[$class], true)) {
+        } elseif (false !== $key = array_search($handler, $this->handlers[$class], true)) {
             unset($this->handlers[$class][$key]);
         }
     }
 
-    public function handle(\Exception $e)
+    public function handle(Exception $e)
     {
-        $class = \get_class($e);
+        $class = get_class($e);
 
         do {
             if (isset($this->handlers[$class])) {
@@ -49,24 +50,24 @@ class ExceptionHandler
                     }
                 }
             }
-        } while ($class = \get_parent_class($class));
+        } while ($class = get_parent_class($class));
 
         return false;
     }
 
     public function register()
     {
-        return \set_exception_handler(function (\Exception $e) {
+        return set_exception_handler(function (Exception $e) {
             if (!$this->handle($e)) {
                 throw $e;
             }
         });
     }
 
-    public function bindLogger(LoggerInterface $logger, $level = LogLevel::ERROR, $class = 'Exception')
+    public function bindLogger(LoggerInterface $logger, $level = LogLevel::ERROR, $class = Exception::class)
     {
         return $this->on($class, function (\Exception $e) use ($logger, $level) {
-            $logger->log($level, $e->getMessage(), ['exception' => $e]);
+            $logger->log($level, $e->getMessage(), ["exception" => $e]);
         });
     }
 }
