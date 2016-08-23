@@ -1,22 +1,22 @@
 <?php
 namespace def\Error;
 
-use Exception;
+use Throwable;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 
-class ExceptionHandler
+class ThrowableErrorHandler
 {
     protected $handlers = [];
 
     public function __construct(callable $defaultHandler = null)
     {
         if (isset($defaultHandler)) {
-            $this->on(Exception::class, $defaultHandler);
+            $this->on(Throwable::class, $defaultHandler);
         }
     }
 
-    public function on($class, callable $handler)
+    public function on(string $class, callable $handler)
     {
         if (!isset($this->handlers[$class])) {
             $this->handlers[$class] = [];
@@ -25,7 +25,7 @@ class ExceptionHandler
         array_unshift($this->handlers[$class], $handler);
     }
 
-    public function off($class, callable $handler = null)
+    public function off(string $class, callable $handler = null)
     {
         if (!isset($this->handlers[$class])) {
             return;
@@ -38,7 +38,7 @@ class ExceptionHandler
         }
     }
 
-    public function handle(Exception $e)
+    public function handle(Throwable $e)
     {
         $class = get_class($e);
 
@@ -52,19 +52,27 @@ class ExceptionHandler
             }
         } while ($class = get_parent_class($class));
 
+        if (isset($this->handlers[Throwable::class])) {
+            foreach ($this->handlers[Throwable::class] as $handler) {
+                if (true === $handler($e)) {
+                    return true;
+                }
+            }
+        }
+
         return false;
     }
 
     public function register()
     {
-        return set_exception_handler(function (Exception $e) {
+        return set_exception_handler(function (Throwable $e) {
             if (!$this->handle($e)) {
                 throw $e;
             }
         });
     }
 
-    public function bindLogger(LoggerInterface $logger, $level = LogLevel::ERROR, $class = Exception::class)
+    public function bindLogger(LoggerInterface $logger, int $level = LogLevel::ERROR, string $class = Throwable::class)
     {
         return $this->on($class, function (\Exception $e) use ($logger, $level) {
             $logger->log($level, $e->getMessage(), ["exception" => $e]);
