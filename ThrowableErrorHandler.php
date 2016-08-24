@@ -72,8 +72,11 @@ class ThrowableErrorHandler
         });
     }
 
-    public function bindLogger(LoggerInterface $logger, int $level = LogLevel::ERROR, string $class = Throwable::class)
-    {
+    public function bindLogger(
+        LoggerInterface $logger,
+        string $level = LogLevel::ERROR,
+        string $class = Throwable::class
+    ) {
         return $this->on($class, function (\Exception $e) use ($logger, $level) {
             $logger->log($level, $e->getMessage(), ["exception" => $e]);
         });
