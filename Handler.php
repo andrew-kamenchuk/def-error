@@ -111,7 +111,7 @@ class Handler
 
     public function register()
     {
-        $reservedMemory = \str_repeat("*", 1024 * 1024);
+        $reservedMemory = str_repeat("*", 1024 * 1024);
 
         $fatalError = E_PARSE | E_ERROR | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR;
 
@@ -126,7 +126,7 @@ class Handler
         return set_error_handler([$this, "handle"]);
     }
 
-    public function bindLogger(LoggerInterface $logger, $level = LogLevel::ERROR, $mask = \E_ALL)
+    public function bindLogger(LoggerInterface $logger, $level = LogLevel::ERROR, $mask = E_ALL)
     {
         return $this->on($mask, function (
             $type,
