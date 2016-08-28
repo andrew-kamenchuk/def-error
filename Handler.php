@@ -11,6 +11,8 @@ class Handler
     private $includeTrace = false;
     private $traceOptions = DEBUG_BACKTRACE_PROVIDE_OBJECT;
 
+    private $asException = 0;
+
     protected $handlers = [
         E_ERROR             => [], E_WARNING         => [],
         E_PARSE             => [], E_NOTICE          => [],
@@ -31,6 +33,11 @@ class Handler
         return $this->errorReporting;
     }
 
+    public function asException($level)
+    {
+        $this->asException |= $level;
+    }
+
     public function setIncludeTrace($includeTrace = true, $traceOptions = DEBUG_BACKTRACE_PROVIDE_OBJECT)
     {
         $this->includeTrace = $includeTrace;
@@ -39,35 +46,38 @@ class Handler
 
     public function on($error, callable $handler)
     {
-        $j = 1;
-        while ($j <<= 1 < E_ALL) {
-            if ($j & $error) {
-                array_unshift($this->handlers[$j], $handler);
+        for ($i = 1; $i < E_ALL; $i <<= 1) {
+            if ($i & $error) {
+                array_unshift($this->handlers[$i], $handler);
             }
         }
     }
 
     public function off($error, callable $handler = null)
     {
-        $j = 1;
-        while ($j <<= 1 < E_ALL) {
-            if ($j & $error) {
-                if (!isset($handler)) {
-                    $this->handlers[$j] = [];
-                } elseif (false !== $key = array_search($handler, $this->handlers[$j], true)) {
-                    unset($this->handlers[$j][$key]);
-                }
+        for ($i = 1; $i < E_ALL; $i <<= 1) {
+            if (0 == ($i & $error)) {
+                continue;
+            }
+
+            if (!isset($handler)) {
+                $this->handlers[$i] = [];
+            } elseif (false !== $key = array_search($handler, $this->handlers[$i], true)) {
+                unset($this->handlers[$i][$key]);
             }
         }
     }
 
-    protected function getTrace()
+    private function getTrace()
     {
         $trace = debug_backtrace($this->traceOptions);
-        array_shift($trace);
 
         foreach (array_reverse($trace, true) as $index => $item) {
-            if (isset($item['class']) && (__CLASS__ == $item['class'] || \is_subclass_of($item['class'], __CLASS__))) {
+            if (!isset($item["class"])) {
+                continue;
+            }
+
+            if (self::class == $item["class"] || is_subclass_of($item["class"], self::class)) {
                 array_splice($trace, 0, $index + 1);
                 break;
             }
@@ -78,17 +88,21 @@ class Handler
 
     public function handle($type, $message, $file = null, $line = null, array $context = null)
     {
-        if ($type & $this->errorReporting & error_reporting()) {
-            $trace = [];
+        $errorReporting = $this->errorReporting & error_reporting();
 
-            if ($this->includeTrace) {
-                $trace = $this->getTrace();
-            }
+        if (0 == ($type & $errorReporting)) {
+            return false;
+        }
 
-            foreach ($this->handlers[$type] as $handler) {
-                if (true === $handler($type, $message, $file, $line, $context, $trace)) {
-                     return true;
-                }
+        if ($type & $this->asException) {
+            throw new ErrorException($message, $type, $type, $file, $line);
+        }
+
+        $trace = $this->includeTrace ? $this->getTrace() : [];
+
+        foreach ($this->handlers[$type] as $handler) {
+            if (true === $handler($type, $message, $file, $line, $context, $trace)) {
+                 return true;
             }
         }
 
@@ -117,9 +131,9 @@ class Handler
         return $this->on($mask, function (
             $type,
             $message,
-            $file = null,
-            $line = null,
-            array $context = null,
+            $file,
+            $line,
+            array $context,
             array $trace
         ) use (
             $logger,
